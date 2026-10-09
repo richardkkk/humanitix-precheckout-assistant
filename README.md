@@ -13,8 +13,8 @@ A local Tampermonkey userscript that prepares Humanitix checkouts, supports conf
 - Fills known buyer and student fields while stopping on unknown required fields
 - Disables Humanitix marketing email by default
 - Reads Humanitix's visible `Sales start at ...` time automatically and refreshes once when sales open
-- Supports Google Pay, credit card, and PayPal selection
-- Requires a real user click to open the browser-native Google Pay sheet
+- Lets each user choose Google Pay, Apple Pay, credit card, PayPal, or stop at the payment page during first-run setup
+- Requires a real user click to open a browser-native Google Pay or Apple Pay sheet
 - Never confirms the final wallet payment
 
 ## Install
@@ -50,7 +50,7 @@ The JSON fallback is not needed for ordinary Humanitix scheduled-release pages.
 
 ## Payment boundary
 
-Browser-native wallets require a foreground tab and a real user gesture. The script prepares the payment section and shows **打开 Google Pay**. The user must click that button and must personally perform any final wallet confirmation.
+Browser-native wallets require a foreground tab and a real user gesture. The script prepares the payment section and shows **打开 Google Pay** or **打开 Apple Pay**. The user must click that button and must personally perform any final wallet confirmation. Apple Pay is available only when Humanitix exposes it in a compatible Apple/Safari environment; it normally does not appear in Windows Chrome. Credit card and PayPal selections stop on their payment section for manual completion.
 
 ## Privacy
 

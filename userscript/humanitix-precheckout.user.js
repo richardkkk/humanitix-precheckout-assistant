@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Humanitix Pre-checkout Assistant
 // @namespace    https://github.com/richardkkk/humanitix-precheckout-assistant
-// @version      1.3.0
+// @version      1.4.0
 // @description  Prepare Humanitix tickets with local profiles, scheduled releases, and a manual final wallet step.
 // @author       Richard
 // @license      MIT
@@ -404,9 +404,17 @@
     setStatus("已进入付款区，正在选择付款方式…");
     const methodPatterns = {
       "google-pay": /^Google Pay$/i,
+      "apple-pay": /^Apple Pay$/i,
       "credit-card": /Credit Card/i,
       paypal: /^PayPal$/i,
       none: null,
+    };
+    const methodLabels = {
+      "google-pay": "Google Pay",
+      "apple-pay": "Apple Pay",
+      "credit-card": "Credit Card",
+      paypal: "PayPal",
+      none: "付款页面",
     };
     const pattern = methodPatterns[config.payment.method];
     if (pattern) {
@@ -427,6 +435,8 @@
     if (checkout.length !== 1) throw new Error(`Checkout with… 按钮数量为 ${checkout.length}，已停止。`);
     running = false;
     sessionStorage.removeItem(ACTIVE_KEY);
+    const methodLabel = methodLabels[config.payment.method] || config.payment.method;
+    paymentActionButton.textContent = `打开 ${methodLabel}`;
     paymentActionButton.hidden = false;
     paymentActionButton.onclick = () => {
       const currentCheckout = allVisible("button, [role='button']").filter((element) => {
@@ -441,7 +451,7 @@
       paymentActionButton.hidden = true;
       setStatus("已请求打开付款窗口；最终继续或付款仍需手动确认。", "ok");
     };
-    setStatus("Google Pay 已就绪。请亲手点击下方“打开 Google Pay”；Chrome 要求这一步必须是用户手势。", "ok");
+    setStatus(`${methodLabel} 已就绪。请亲手点击下方“打开 ${methodLabel}”；浏览器可能要求这一步必须是用户手势。`, "ok");
   }
 
   async function run() {
@@ -470,7 +480,7 @@
     }
     if (findButton(/^Continue to Payment$/i)) {
       await fillTicketInfo(config, profile);
-      await waitFor(() => findPaymentControl(/^Google Pay$|Credit Card|^PayPal$/i), "Payment", 15000);
+      await waitFor(() => findPaymentControl(/^Google Pay$|^Apple Pay$|Credit Card|^PayPal$/i), "Payment", 15000);
     }
     await handlePayment(config);
   }
@@ -509,6 +519,15 @@
           <label>学习阶段<select name="studyLevel"><option>Postgraduate</option><option>Undergraduate</option></select></label>
           <label>学习状态<select name="studyLoad"><option>Full-Time</option><option>Part-Time</option></select></label>
         </div>
+        <label style="display:block;margin-top:12px">首选付款方式
+          <select name="paymentMethod" style="display:block;width:100%;margin-top:4px">
+            <option value="google-pay">Google Pay</option>
+            <option value="apple-pay">Apple Pay</option>
+            <option value="credit-card">Credit Card</option>
+            <option value="paypal">PayPal</option>
+            <option value="none">只停在付款页</option>
+          </select>
+        </label>
         <label style="display:block;margin-top:14px"><input name="autoStart" type="checkbox"> 已配置开售时间的活动自动倒计时</label>
         <label style="display:block;margin-top:8px"><input name="humanitixMarketing" type="checkbox"> 接收 Humanitix 推广邮件</label>
         <div data-error style="min-height:20px;margin-top:10px;color:#b42318;font-weight:700"></div>
@@ -543,6 +562,7 @@
     form.elements.enrolmentType.value = profile.enrolmentType || "International";
     form.elements.studyLevel.value = profile.studyLevel || "Postgraduate";
     form.elements.studyLoad.value = profile.studyLoad || "Full-Time";
+    form.elements.paymentMethod.value = config.payment?.method || "google-pay";
     form.elements.autoStart.checked = config.preferences?.autoStartScheduledEvents !== false;
     form.elements.humanitixMarketing.checked = Boolean(config.preferences?.humanitixMarketing);
     overlay.querySelector("[data-cancel]").addEventListener("click", () => overlay.remove());
@@ -574,6 +594,10 @@
       next.preferences.humanitixMarketing = form.elements.humanitixMarketing.checked;
       next.preferences.organiserMarketing = false;
       next.preferences.acceptArcTerms = true;
+      next.payment ||= {};
+      next.payment.method = String(data.get("paymentMethod") || "google-pay");
+      next.payment.openPaymentSheet = ["google-pay", "apple-pay"].includes(next.payment.method);
+      next.payment.checkoutButtonText ||= "";
       saveConfig(next);
       overlay.remove();
       setStatus("资料已保存，可以启动当前活动。", "ok");

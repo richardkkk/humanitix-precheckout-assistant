@@ -21,6 +21,8 @@ test("first-run setup and payment boundary are present", () => {
   assert.match(source, /Humanitix 助手首次设置/);
   assert.match(source, /打开 Google Pay/);
   assert.match(source, /autoStartScheduledEvents/);
+  assert.match(source, /<option value="apple-pay">Apple Pay<\/option>/);
+  assert.match(source, /"apple-pay": \/\^Apple Pay\$\/i/);
 });
 
 test("reads the next displayed Humanitix release time with Sydney daylight offset", () => {
