@@ -13,6 +13,8 @@ A local Tampermonkey userscript that prepares Humanitix checkouts, supports conf
 - Fills known buyer and student fields while stopping on unknown required fields
 - Treats event-specific fields such as Confirm Email and student ID as optional when the page omits them
 - Supports alternate UNSW question wording, including student confirmation, `UNSW Student zID`, `International Student`, and a plain `Continue` button
+- Stops for confirmation when a free event shows only a plain buyer-information `Continue` button that may submit the booking
+- Waits for conditional zID, enrolment, and study-level questions that appear after confirming UNSW student status
 - Disables Humanitix marketing email by default
 - Reads Humanitix's visible `Sales start at ...` time automatically and refreshes once when sales open
 - Lets each user choose Google Pay, Apple Pay, credit card, PayPal, or stop at the payment page during first-run setup

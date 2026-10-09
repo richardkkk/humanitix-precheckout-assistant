@@ -38,6 +38,18 @@ test("supports alternate UNSW ticket questions and continue label", () => {
   assert.match(source, /Continue\(\?: to Payment\)\?/);
 });
 
+test("stops for confirmation when buyer Continue may submit a free booking", () => {
+  assert.match(source, /Continue to \(\?:Ticket info\|Payment\)/);
+  assert.match(source, /这个 Continue 可能直接完成免费报名/);
+  assert.match(source, /await waitFor\(\(\) => !inputById\("firstName"\)/);
+});
+
+test("waits for conditional Food Hub questions after selecting student status", () => {
+  assert.match(source, /const hasStudentQuestion = await chooseCombobox/);
+  assert.match(source, /选择 UNSW Student 后显示后续问题/);
+  assert.match(source, /确认已选择 \$\{value\}/);
+});
+
 test("reads the next displayed Humanitix release time with Sydney daylight offset", () => {
   const start = source.indexOf("function extractNextReleaseAt");
   const end = source.indexOf("\n\n  async function waitUntilRelease", start);

@@ -13,6 +13,8 @@
 - 自动填写已识别的购买人和学生信息；遇到未知必填项会停止提醒
 - Confirm Email、zID 等活动未提供的字段会自动跳过
 - 兼容 UNSW Student 确认、Ticket info 中的必填 zID、`International Student` 选项以及普通 `Continue` 按钮
+- 免费活动在 Buyer information 后只有普通 `Continue` 时会填好资料并停下，避免未经确认直接完成报名
+- 会等待选择 UNSW Student 后动态出现的 zID、enrolment type 和 study level，不会过早判定字段缺失
 - 默认取消 Humanitix 推广邮件
 - 自动读取页面显示的 `Sales start at ...` 开售时间，到点只刷新一次
 - 首次设置时可选择 Google Pay、Apple Pay、信用卡、PayPal 或只停在付款页

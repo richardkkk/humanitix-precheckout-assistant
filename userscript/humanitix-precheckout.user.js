@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Humanitix Pre-checkout Assistant
 // @namespace    https://github.com/richardkkk/humanitix-precheckout-assistant
-// @version      1.4.3
+// @version      1.4.4
 // @description  Prepare Humanitix tickets with local profiles, scheduled releases, and a manual final wallet step.
 // @author       Richard
 // @license      MIT
@@ -378,9 +378,21 @@
     if (unfilledRequired.length) {
       throw new Error(`还有 ${unfilledRequired.length} 个未识别的购买人必填字段，请手动填写后重新启动。`);
     }
-    const button = findButton(/^Continue to Ticket info$/i);
-    if (!button) throw new Error("找不到 Continue to Ticket info。");
-    button.click();
+    const nextStep = findButton(/^Continue to (?:Ticket info|Payment)$/i);
+    if (nextStep) {
+      nextStep.click();
+      return true;
+    }
+
+    const ambiguousContinue = findButton(/^Continue$/i);
+    if (ambiguousContinue) {
+      ambiguousContinue.style.outline = "3px solid #f79009";
+      ambiguousContinue.style.outlineOffset = "2px";
+      ambiguousContinue.scrollIntoView({ behavior: "smooth", block: "center" });
+      stop("资料已填写。这个 Continue 可能直接完成免费报名，请确认后手动点击。", "ok");
+      return false;
+    }
+    throw new Error("找不到 Buyer information 的继续按钮。");
   }
 
   function comboboxByLabel(pattern) {
@@ -408,13 +420,25 @@
       5000,
     );
     option.click();
-    await sleep(100);
+    await waitFor(() => {
+      const updated = comboboxByLabel(pattern);
+      return updated && updated.getAttribute("data-none-selected") !== "true";
+    }, `确认已选择 ${value}`, 5000);
     return true;
   }
 
   async function fillTicketInfo(config, profile) {
     setStatus("正在填写学生信息…");
-    await chooseCombobox(/Are you a UNSW Student/i, "Yes", false);
+    const hasStudentQuestion = await chooseCombobox(/Are you a UNSW Student/i, "Yes", false);
+    if (hasStudentQuestion) {
+      await waitFor(
+        () =>
+          inputNearPattern(/UNSW Student zID/i) ||
+          comboboxByLabel(/Enrolment Type|What is your enrolment type/i),
+        "选择 UNSW Student 后显示后续问题",
+        5000,
+      );
+    }
     const ticketZid = inputNearPattern(/UNSW Student zID/i);
     if (ticketZid) setNativeValue(ticketZid, profile.zid);
     await chooseCombobox(
@@ -529,8 +553,9 @@
 
     const buyer = inputById("firstName");
     if (buyer) {
-      await fillBuyer(config, profile);
-      await waitFor(() => findButton(/^Continue(?: to Payment)?$/i), "Ticket info", 15000);
+      const advancing = await fillBuyer(config, profile);
+      if (!advancing) return;
+      await waitFor(() => !inputById("firstName"), "下一步", 15000);
     }
     if (findButton(/^Continue(?: to Payment)?$/i)) {
       await fillTicketInfo(config, profile);
