@@ -25,6 +25,11 @@ test("first-run setup and payment boundary are present", () => {
   assert.match(source, /"apple-pay": \/\^Apple Pay\$\/i/);
 });
 
+test("optional buyer fields are skipped when an event omits them", () => {
+  assert.match(source, /fillInputById\("emailConfirmation", profile\.email\);/);
+  assert.match(source, /if \(zid\) setNativeValue\(zid, profile\.zid\);/);
+});
+
 test("reads the next displayed Humanitix release time with Sydney daylight offset", () => {
   const start = source.indexOf("function extractNextReleaseAt");
   const end = source.indexOf("\n\n  async function waitUntilRelease", start);

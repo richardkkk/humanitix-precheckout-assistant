@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Humanitix Pre-checkout Assistant
 // @namespace    https://github.com/richardkkk/humanitix-precheckout-assistant
-// @version      1.4.1
+// @version      1.4.2
 // @description  Prepare Humanitix tickets with local profiles, scheduled releases, and a manual final wallet step.
 // @author       Richard
 // @license      MIT
@@ -183,6 +183,16 @@
     return input instanceof HTMLInputElement && visible(input) ? input : null;
   }
 
+  function fillInputById(id, value, required = false) {
+    const input = inputById(id);
+    if (!input) {
+      if (required) throw new Error(`找不到必填输入框：${id}`);
+      return false;
+    }
+    setNativeValue(input, value);
+    return true;
+  }
+
   function inputNearText(text) {
     const textElement = [...document.querySelectorAll("label, p, div, span")]
       .filter(visible)
@@ -339,15 +349,20 @@
     setStatus("正在填写购买人资料…");
     const firstName = await waitFor(() => inputById("firstName"), "First Name");
     setNativeValue(firstName, profile.firstName);
-    setNativeValue(inputById("lastName"), profile.lastName);
-    setNativeValue(inputById("email"), profile.email);
-    setNativeValue(inputById("emailConfirmation"), profile.email);
-    setNativeValue(inputById("mobile"), profile.mobile);
+    fillInputById("lastName", profile.lastName, true);
+    fillInputById("email", profile.email, true);
+    fillInputById("emailConfirmation", profile.email);
+    fillInputById("mobile", profile.mobile, true);
     const zid = inputNearText("What's your zID? (If known)");
-    if (!zid) throw new Error("找不到 zID 输入框。");
-    setNativeValue(zid, profile.zid);
+    if (zid) setNativeValue(zid, profile.zid);
     setCheckbox("humanitixMailListOptIn", Boolean(config.preferences.humanitixMarketing));
     setCheckbox("organiserMailListOptIn", Boolean(config.preferences.organiserMarketing));
+    const unfilledRequired = allVisible("input[aria-required='true']").filter(
+      (input) => input.type !== "checkbox" && !String(input.value || "").trim(),
+    );
+    if (unfilledRequired.length) {
+      throw new Error(`还有 ${unfilledRequired.length} 个未识别的购买人必填字段，请手动填写后重新启动。`);
+    }
     const button = findButton(/^Continue to Ticket info$/i);
     if (!button) throw new Error("找不到 Continue to Ticket info。");
     button.click();
