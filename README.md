@@ -12,7 +12,7 @@ A local Tampermonkey userscript that prepares Humanitix checkouts, supports conf
 - Prompts for a manual choice when multiple ticket types are purchasable
 - Fills known buyer and student fields while stopping on unknown required fields
 - Disables Humanitix marketing email by default
-- Can wait for a configured release time and refresh once when sales open
+- Reads Humanitix's visible `Sales start at ...` time automatically and refreshes once when sales open
 - Supports Google Pay, credit card, and PayPal selection
 - Requires a real user click to open the browser-native Google Pay sheet
 - Never confirms the final wallet payment
@@ -31,7 +31,11 @@ The script does not depend on a ticket name or fixed screen position. If exactly
 
 ## Scheduled releases
 
-Events can be added through **Advanced: edit complete JSON configuration** in the Tampermonkey menu:
+No event configuration is normally required. When the ticket page displays text such as `Sales start at Mon 12th Oct 2026, 12:00 pm AEDT`, the script reads the date, time, and AEST/AEDT timezone automatically. Opening the event page before release starts the countdown; Chrome and the tab must stay open.
+
+The page's displayed release time takes priority, so refreshing the page picks up a host's changed schedule. The script does not repeatedly poll Humanitix.
+
+For unusual pages that do not expose a readable sale time, an optional fallback can be added through **Advanced: edit complete JSON configuration**:
 
 ```json
 {
@@ -42,7 +46,7 @@ Events can be added through **Advanced: edit complete JSON configuration** in th
 }
 ```
 
-When `autoStartScheduledEvents` is enabled, opening that event page before `releaseAt` starts the countdown automatically. Chrome and the tab must stay open. The script does not repeatedly poll Humanitix.
+The JSON fallback is not needed for ordinary Humanitix scheduled-release pages.
 
 ## Payment boundary
 
@@ -63,4 +67,3 @@ npm test
 ```
 
 MIT License.
-

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Humanitix Pre-checkout Assistant
 // @namespace    https://github.com/richardkkk/humanitix-precheckout-assistant
-// @version      1.2.0
+// @version      1.3.0
 // @description  Prepare Humanitix tickets with local profiles, scheduled releases, and a manual final wallet step.
 // @author       Richard
 // @license      MIT
@@ -47,31 +47,7 @@
       openPaymentSheet: true,
       checkoutButtonText: "",
     },
-    events: [
-      {
-        id: "aboriginal-cultural-tours-test",
-        url: "https://events.humanitix.com/arc-goes-to-aboriginal-cultural-tours-sponsored-by-medibank",
-        expectedPriceAud: 5,
-      },
-      {
-        id: "royal-national-park",
-        url: "https://events.humanitix.com/arc-goes-to-royal-national-park-sponsored-by-medibank",
-        releaseAt: "2026-10-12T10:00:00+11:00",
-        expectedPriceAud: 20,
-      },
-      {
-        id: "jervis-bay",
-        url: "https://events.humanitix.com/arc-goes-to-jervis-bay-sponsored-by-medibank",
-        releaseAt: "2026-10-12T10:00:00+11:00",
-        expectedPriceAud: 20,
-      },
-      {
-        id: "snorkelling-second-release",
-        url: "https://events.humanitix.com/arc-goes-to-snorkeling-sponsored-by-medibank",
-        releaseAt: "2026-10-12T12:00:00+11:00",
-        expectedPriceAud: 15,
-      },
-    ],
+    events: [],
   };
 
   let running = false;
@@ -259,6 +235,27 @@
     return config.events?.find((item) => normalizeEventUrl(item.url) === currentUrl) || null;
   }
 
+  function extractNextReleaseAt(text, now = Date.now()) {
+    const months = {
+      jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5,
+      jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11,
+    };
+    const pattern = /Sales start at\s+(?:[A-Za-z]+\s+)?(\d{1,2})(?:st|nd|rd|th)?\s+([A-Za-z]+)\s+(\d{4}),?\s+(\d{1,2}):(\d{2})\s*(am|pm)\s*(AEDT|AEST)/gi;
+    const future = [];
+    for (const match of text.matchAll(pattern)) {
+      const month = months[match[2].slice(0, 3).toLowerCase()];
+      if (month == null) continue;
+      let hour = Number(match[4]) % 12;
+      if (match[6].toLowerCase() === "pm") hour += 12;
+      const offsetHours = match[7].toUpperCase() === "AEDT" ? 11 : 10;
+      const timestamp = Date.UTC(
+        Number(match[3]), month, Number(match[1]), hour - offsetHours, Number(match[5]), 0,
+      );
+      if (timestamp > now) future.push(timestamp);
+    }
+    return future.length ? new Date(Math.min(...future)).toISOString() : null;
+  }
+
   async function waitUntilRelease(event) {
     if (!event?.releaseAt) return false;
     const releaseTime = new Date(event.releaseAt).getTime();
@@ -279,14 +276,16 @@
     setStatus("正在识别可购买票种…");
     const body = normalize(document.body.innerText);
     const event = configuredEvent(config);
+    const displayedReleaseAt = extractNextReleaseAt(body);
+    const releaseTarget = displayedReleaseAt ? { releaseAt: displayedReleaseAt } : event;
     if (/This event is yet to launch/i.test(body)) {
-      if (await waitUntilRelease(event)) return false;
+      if (await waitUntilRelease(releaseTarget)) return false;
       throw new Error("活动尚未发布；没有可用的未来开售时间可等待。");
     }
     const quantities = allVisible('input[type="number"]:not(:disabled)');
     if (quantities.length === 0) {
       if (/Sales start at/i.test(body)) {
-        if (await waitUntilRelease(event)) return false;
+        if (await waitUntilRelease(releaseTarget)) return false;
         throw new Error("票尚未开售；配置中没有可用的未来开售时间。");
       }
       if (/Sold out|Join waitlist/i.test(body)) throw new Error("当前没有可购买票种，可能已售罄。");
@@ -629,7 +628,12 @@
   } else {
     const config = loadConfig();
     const event = configuredEvent(config);
-    const releaseTime = event?.releaseAt ? new Date(event.releaseAt).getTime() : NaN;
+    const displayedReleaseAt = extractNextReleaseAt(normalize(document.body?.innerText));
+    const releaseTime = displayedReleaseAt
+      ? new Date(displayedReleaseAt).getTime()
+      : event?.releaseAt
+        ? new Date(event.releaseAt).getTime()
+        : NaN;
     if (
       config.preferences?.autoStartScheduledEvents &&
       Number.isFinite(releaseTime) &&
