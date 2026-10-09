@@ -36,3 +36,35 @@ test("reads the next displayed Humanitix release time with Sydney daylight offse
   );
   assert.equal(result, "2026-10-12T01:00:00.000Z");
 });
+
+test("uses a 150ms precision window but never reloads before release", async () => {
+  const start = source.indexOf("async function waitUntilRelease");
+  const end = source.indexOf("\n\n  async function handleTicketPage", start);
+  assert.ok(start >= 0 && end > start);
+  const functionSource = source.slice(start, end);
+  const runHarness = Function(`
+    return async () => {
+      const RealDate = globalThis.Date;
+      let now = 1000;
+      let running = true;
+      let reloadAt = null;
+      const sleeps = [];
+      class FakeDate extends RealDate {
+        static now() { return now; }
+      }
+      const Date = FakeDate;
+      const sleep = async (milliseconds) => {
+        sleeps.push(milliseconds);
+        now += milliseconds;
+      };
+      const setStatus = () => {};
+      const location = { reload() { reloadAt = now; } };
+      ${functionSource}
+      await waitUntilRelease({ releaseAt: new RealDate(3500).toISOString() });
+      return { reloadAt, sleeps };
+    };
+  `)();
+  const result = await runHarness();
+  assert.equal(result.reloadAt, 3500);
+  assert.ok(result.sleeps.some((milliseconds) => milliseconds <= 10));
+});

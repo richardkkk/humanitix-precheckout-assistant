@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Humanitix Pre-checkout Assistant
 // @namespace    https://github.com/richardkkk/humanitix-precheckout-assistant
-// @version      1.4.0
+// @version      1.4.1
 // @description  Prepare Humanitix tickets with local profiles, scheduled releases, and a manual final wallet step.
 // @author       Richard
 // @license      MIT
@@ -260,11 +260,18 @@
     if (!event?.releaseAt) return false;
     const releaseTime = new Date(event.releaseAt).getTime();
     if (!Number.isFinite(releaseTime) || releaseTime <= Date.now()) return false;
-    while (running && Date.now() < releaseTime) {
-      const remaining = releaseTime - Date.now();
-      const seconds = Math.max(1, Math.ceil(remaining / 1000));
+    const precisionWindowMs = 150;
+    const precisionStart = releaseTime - precisionWindowMs;
+    while (running && Date.now() < precisionStart) {
+      const remaining = precisionStart - Date.now();
+      const seconds = Math.max(1, Math.ceil((releaseTime - Date.now()) / 1000));
       setStatus(`● 已启动并等待中｜距开售 ${seconds} 秒｜请保持此标签页打开`, "waiting");
       await sleep(Math.min(1000, remaining));
+    }
+    if (!running) return true;
+    setStatus("● 即将开售｜正在进行最后 150ms 精确等待，请保持标签页在前台", "waiting");
+    while (running && Date.now() < releaseTime) {
+      await sleep(Math.min(10, releaseTime - Date.now()));
     }
     if (!running) return true;
     setStatus("● 已到开售时间，正在刷新票务页…", "ok");

@@ -35,6 +35,8 @@ No event configuration is normally required. When the ticket page displays text 
 
 The page's displayed release time takes priority, so refreshing the page picks up a host's changed schedule. The script does not repeatedly poll Humanitix.
 
+During the final 150 ms, the script switches to a short local timer for better precision, but it does not request the page before the official release timestamp. Keeping the tab in the foreground near release reduces browser timer throttling.
+
 For unusual pages that do not expose a readable sale time, an optional fallback can be added through **Advanced: edit complete JSON configuration**:
 
 ```json
