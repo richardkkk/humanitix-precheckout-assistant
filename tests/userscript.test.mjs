@@ -30,6 +30,14 @@ test("optional buyer fields are skipped when an event omits them", () => {
   assert.match(source, /if \(zid\) setNativeValue\(zid, profile\.zid\);/);
 });
 
+test("supports alternate UNSW ticket questions and continue label", () => {
+  assert.match(source, /Are you a UNSW Student/);
+  assert.match(source, /UNSW Student zID/);
+  assert.match(source, /What is your enrolment type/);
+  assert.match(source, /What is your level of study/);
+  assert.match(source, /Continue\(\?: to Payment\)\?/);
+});
+
 test("reads the next displayed Humanitix release time with Sydney daylight offset", () => {
   const start = source.indexOf("function extractNextReleaseAt");
   const end = source.indexOf("\n\n  async function waitUntilRelease", start);

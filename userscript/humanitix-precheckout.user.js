@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Humanitix Pre-checkout Assistant
 // @namespace    https://github.com/richardkkk/humanitix-precheckout-assistant
-// @version      1.4.2
+// @version      1.4.3
 // @description  Prepare Humanitix tickets with local profiles, scheduled releases, and a manual final wallet step.
 // @author       Richard
 // @license      MIT
@@ -206,6 +206,21 @@
     return null;
   }
 
+  function inputNearPattern(pattern) {
+    const candidates = [...document.querySelectorAll("label, p, div, span")]
+      .filter(visible)
+      .filter((element) => pattern.test(normalize(element.innerText)))
+      .sort((left, right) => normalize(left.innerText).length - normalize(right.innerText).length);
+    for (const candidate of candidates) {
+      let current = candidate;
+      for (let depth = 0; depth < 6 && current; depth += 1, current = current.parentElement) {
+        const inputs = [...current.querySelectorAll("input")].filter(visible);
+        if (inputs.length === 1) return inputs[0];
+      }
+    }
+    return null;
+  }
+
   function setCheckbox(id, desired) {
     const checkbox = document.getElementById(id);
     if (!(checkbox instanceof HTMLInputElement)) return;
@@ -376,7 +391,7 @@
     });
   }
 
-  async function chooseCombobox(pattern, value, required = true) {
+  async function chooseCombobox(pattern, value, required = true, alternatives = []) {
     const combo = comboboxByLabel(pattern);
     if (!combo) {
       if (required) throw new Error(`找不到必填学生信息：${pattern.source}`);
@@ -384,8 +399,11 @@
     }
     if (combo.getAttribute("data-none-selected") !== "true") return true;
     combo.click();
+    const acceptedValues = [value, ...alternatives].map(normalize);
     const option = await waitFor(
-      () => allVisible("[role='option'], li, div").filter((element) => normalize(element.innerText) === value).at(-1),
+      () => allVisible("[role='option'], li, div")
+        .filter((element) => acceptedValues.includes(normalize(element.innerText)))
+        .at(-1),
       `选项 ${value}`,
       5000,
     );
@@ -396,8 +414,16 @@
 
   async function fillTicketInfo(config, profile) {
     setStatus("正在填写学生信息…");
-    await chooseCombobox(/Enrolment Type/i, profile.enrolmentType);
-    await chooseCombobox(/Study Level/i, profile.studyLevel);
+    await chooseCombobox(/Are you a UNSW Student/i, "Yes", false);
+    const ticketZid = inputNearPattern(/UNSW Student zID/i);
+    if (ticketZid) setNativeValue(ticketZid, profile.zid);
+    await chooseCombobox(
+      /Enrolment Type|What is your enrolment type/i,
+      profile.enrolmentType,
+      true,
+      [`${profile.enrolmentType} Student`],
+    );
+    await chooseCombobox(/Study Level|What is your level of study/i, profile.studyLevel);
     await chooseCombobox(/Full Time or Part Time|Study Load/i, profile.studyLoad, false);
 
     const unknownRequired = allVisible("[role='combobox'][aria-required='true']").filter(
@@ -405,6 +431,12 @@
     );
     if (unknownRequired.length) {
       throw new Error(`还有 ${unknownRequired.length} 个未识别的必填选项，请手动填写后重新启动。`);
+    }
+    const unknownRequiredInputs = allVisible("input[aria-required='true']").filter(
+      (input) => input.type !== "checkbox" && !String(input.value || "").trim(),
+    );
+    if (unknownRequiredInputs.length) {
+      throw new Error(`还有 ${unknownRequiredInputs.length} 个未识别的 Ticket info 必填字段，请手动填写后重新启动。`);
     }
 
     if (!config.preferences.acceptArcTerms) throw new Error("配置未同意 Arc 条款，已停止。");
@@ -417,8 +449,8 @@
       if (accessibility) setNativeValue(accessibility, profile.accessibilityRequirements);
     }
 
-    const button = findButton(/^Continue to Payment$/i);
-    if (!button) throw new Error("找不到 Continue to Payment。");
+    const button = findButton(/^Continue(?: to Payment)?$/i);
+    if (!button) throw new Error("找不到 Ticket info 的 Continue 按钮。");
     button.click();
   }
 
@@ -498,9 +530,9 @@
     const buyer = inputById("firstName");
     if (buyer) {
       await fillBuyer(config, profile);
-      await waitFor(() => findButton(/^Continue to Payment$/i), "Ticket info", 15000);
+      await waitFor(() => findButton(/^Continue(?: to Payment)?$/i), "Ticket info", 15000);
     }
-    if (findButton(/^Continue to Payment$/i)) {
+    if (findButton(/^Continue(?: to Payment)?$/i)) {
       await fillTicketInfo(config, profile);
       await waitFor(() => findPaymentControl(/^Google Pay$|^Apple Pay$|Credit Card|^PayPal$/i), "Payment", 15000);
     }
