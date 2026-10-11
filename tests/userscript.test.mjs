@@ -67,6 +67,9 @@ test("matches configured options when translation text is appended", () => {
 test("first-run setup supports custom student options", () => {
   assert.match(source, /其他（自定义）/);
   assert.match(source, /name = `\$\{name\}Other`/);
+  assert.match(source, /input\.style\.display = custom \? "block" : "none"/);
+  assert.match(source, /input\.disabled = !custom/);
+  assert.match(source, /input\.required = custom/);
   assert.match(source, /自定义学生信息不能为空/);
 });
 

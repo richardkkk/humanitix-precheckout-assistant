@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Humanitix Pre-checkout Assistant
 // @namespace    https://github.com/richardkkk/humanitix-precheckout-assistant
-// @version      1.4.5
+// @version      1.4.6
 // @description  Prepare Humanitix tickets with local profiles, scheduled releases, and a manual final wallet step.
 // @author       Richard
 // @license      MIT
@@ -665,7 +665,8 @@
       input.value = known ? "" : saved;
       const syncCustomInput = () => {
         const custom = select.value === "__other__";
-        input.hidden = !custom;
+        input.style.display = custom ? "block" : "none";
+        input.disabled = !custom;
         input.required = custom;
       };
       select.addEventListener("change", syncCustomInput);
