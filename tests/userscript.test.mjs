@@ -50,6 +50,26 @@ test("waits for conditional Food Hub questions after selecting student status", 
   assert.match(source, /确认已选择 \$\{value\}/);
 });
 
+test("matches configured options when translation text is appended", () => {
+  const start = source.indexOf("const matchesConfiguredOption");
+  const end = source.indexOf(";\n  const visible", start) + 1;
+  assert.ok(start >= 0 && end > start);
+  const expression = source
+    .slice(start, end)
+    .replace(/^const matchesConfiguredOption\s*=\s*/, "")
+    .replace(/;$/, "");
+  const matcher = Function("normalize", `return (${expression})`)((text) => (text || "").replace(/\\s+/g, " ").trim());
+  assert.equal(matcher("Postgraduate 研究生", ["Postgraduate"]), true);
+  assert.equal(matcher("International 国际的", ["International", "International Student"]), true);
+  assert.equal(matcher("Undergraduate 本科生", ["Postgraduate"]), false);
+});
+
+test("first-run setup supports custom student options", () => {
+  assert.match(source, /其他（自定义）/);
+  assert.match(source, /name = `\$\{name\}Other`/);
+  assert.match(source, /自定义学生信息不能为空/);
+});
+
 test("reads the next displayed Humanitix release time with Sydney daylight offset", () => {
   const start = source.indexOf("function extractNextReleaseAt");
   const end = source.indexOf("\n\n  async function waitUntilRelease", start);

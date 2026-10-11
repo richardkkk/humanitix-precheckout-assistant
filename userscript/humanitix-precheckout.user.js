@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Humanitix Pre-checkout Assistant
 // @namespace    https://github.com/richardkkk/humanitix-precheckout-assistant
-// @version      1.4.4
+// @version      1.4.5
 // @description  Prepare Humanitix tickets with local profiles, scheduled releases, and a manual final wallet step.
 // @author       Richard
 // @license      MIT
@@ -58,6 +58,13 @@
 
   const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   const normalize = (text) => (text || "").replace(/\s+/g, " ").trim();
+  const matchesConfiguredOption = (optionText, acceptedValues) => {
+    const option = normalize(optionText);
+    return acceptedValues.some((value) => {
+      const expected = normalize(value);
+      return option === expected || option.startsWith(`${expected} `);
+    });
+  };
   const visible = (element) => {
     if (!element) return false;
     const style = getComputedStyle(element);
@@ -413,9 +420,11 @@
     combo.click();
     const acceptedValues = [value, ...alternatives].map(normalize);
     const option = await waitFor(
-      () => allVisible("[role='option'], li, div")
-        .filter((element) => acceptedValues.includes(normalize(element.innerText)))
-        .at(-1),
+      () =>
+        allVisible("[role='option'], li, div")
+          .filter((element) => matchesConfiguredOption(element.innerText, acceptedValues))
+          .sort((left, right) => normalize(left.innerText).length - normalize(right.innerText).length)
+          .at(0),
       `选项 ${value}`,
       5000,
     );
@@ -594,9 +603,9 @@
         <p style="margin:0 0 18px;color:#475467">资料只保存在本机 Tampermonkey 存储中，不会上传到项目或第三方服务器。</p>
         <div data-fields style="display:grid;grid-template-columns:1fr 1fr;gap:12px"></div>
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:12px">
-          <label>学生类型<select name="enrolmentType"><option>International</option><option>Domestic</option></select></label>
-          <label>学习阶段<select name="studyLevel"><option>Postgraduate</option><option>Undergraduate</option></select></label>
-          <label>学习状态<select name="studyLoad"><option>Full-Time</option><option>Part-Time</option></select></label>
+          <label>学生类型<select name="enrolmentType"><option>International</option><option>Domestic</option><option value="__other__">其他（自定义）</option></select></label>
+          <label>学习阶段<select name="studyLevel"><option>Postgraduate</option><option>Undergraduate</option><option>Research</option><option>College</option><option value="__other__">其他（自定义）</option></select></label>
+          <label>学习状态<select name="studyLoad"><option>Full-Time</option><option>Part-Time</option><option value="__other__">其他（自定义）</option></select></label>
         </div>
         <label style="display:block;margin-top:12px">首选付款方式
           <select name="paymentMethod" style="display:block;width:100%;margin-top:4px">
@@ -638,9 +647,30 @@
       element.style.borderRadius = "8px";
     });
     const form = overlay.querySelector("[data-form]");
-    form.elements.enrolmentType.value = profile.enrolmentType || "International";
-    form.elements.studyLevel.value = profile.studyLevel || "Postgraduate";
-    form.elements.studyLoad.value = profile.studyLoad || "Full-Time";
+    const customChoices = [
+      ["enrolmentType", "International"],
+      ["studyLevel", "Postgraduate"],
+      ["studyLoad", "Full-Time"],
+    ];
+    for (const [name, fallback] of customChoices) {
+      const select = form.elements[name];
+      const input = document.createElement("input");
+      input.name = `${name}Other`;
+      input.placeholder = "请输入页面上的选项原文";
+      input.style.cssText = "display:block;width:100%;margin-top:6px;padding:9px;border:1px solid #d0d5dd;border-radius:8px";
+      select.insertAdjacentElement("afterend", input);
+      const saved = String(profile[name] || fallback);
+      const known = [...select.options].some((option) => option.value !== "__other__" && option.value === saved);
+      select.value = known ? saved : "__other__";
+      input.value = known ? "" : saved;
+      const syncCustomInput = () => {
+        const custom = select.value === "__other__";
+        input.hidden = !custom;
+        input.required = custom;
+      };
+      select.addEventListener("change", syncCustomInput);
+      syncCustomInput();
+    }
     form.elements.paymentMethod.value = config.payment?.method || "google-pay";
     form.elements.autoStart.checked = config.preferences?.autoStartScheduledEvents !== false;
     form.elements.humanitixMarketing.checked = Boolean(config.preferences?.humanitixMarketing);
@@ -655,6 +685,17 @@
       }
       const next = loadConfig();
       const selected = next.selectedProfile || "me";
+      const configuredChoice = (name, fallback) => {
+        const choice = String(data.get(name) || fallback);
+        return choice === "__other__" ? String(data.get(`${name}Other`) || "").trim() : choice;
+      };
+      const enrolmentType = configuredChoice("enrolmentType", "International");
+      const studyLevel = configuredChoice("studyLevel", "Postgraduate");
+      const studyLoad = configuredChoice("studyLoad", "Full-Time");
+      if (!enrolmentType || !studyLevel || !studyLoad) {
+        overlay.querySelector("[data-error]").textContent = "自定义学生信息不能为空。";
+        return;
+      }
       next.profiles ||= {};
       next.profiles[selected] = {
         ...(next.profiles[selected] || {}),
@@ -663,9 +704,9 @@
         email,
         mobile: String(data.get("mobile") || "").trim(),
         zid: String(data.get("zid") || "").trim(),
-        enrolmentType: String(data.get("enrolmentType") || "International"),
-        studyLevel: String(data.get("studyLevel") || "Postgraduate"),
-        studyLoad: String(data.get("studyLoad") || "Full-Time"),
+        enrolmentType,
+        studyLevel,
+        studyLoad,
         accessibilityRequirements: next.profiles[selected]?.accessibilityRequirements || "",
       };
       next.preferences ||= {};
